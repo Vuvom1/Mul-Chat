@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>
+    {{page_title}}
+    {% if page_subtitle %}
+        <small>{{ page_subtitle }}</small>
+    {% endif %}
+</h1>
+
+<!-- Debug info -->
+<div style="background: #f5f5f5; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd;">
+    Debug: {{ messages|length }} messages available
+</div>
+
+{% if messages %}
+    <ul class="message-list">
+        {% for message in messages %}
+            <li class="message-item">
+                <span class="message-id">#{{ message.id }}</span>
+                <span class="message-text">{{ message.content }}</span>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No messages available.</p>
+{% endif %}
+{% endblock %}

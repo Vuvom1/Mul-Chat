@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{page_title}}</h1>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h2>Real-time Chat</h2>
+            <div id="messages" class="border p-3 mb-3" style="height: 300px; overflow-y: auto;"></div>
+            
+            <div class="form-group">
+                <label for="messageInput">Message:</label>
+                <input type="text" id="messageInput" class="form-control" placeholder="Type your message...">
+            </div>
+            <button id="sendBtn" class="btn btn-primary mt-2">Send</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/sse-handler.js"></script>
+<script>
+    // Initialize SSE connection
+    const sseHandler = new SSEHandler({
+        onMessage: (data) => {
+            if (data.type === 'chat' || data.type === 'system') {
+                appendMessage(data);
+            }
+        },
+        onConnect: () => {
+            appendMessage({
+                type: 'system',
+                content: 'Connected to chat server via SSE',
+                timestamp: new Date().toISOString()
+            });
+        }
+    });
+    sseHandler.connect();
+    
+    // WebSocket is used for sending messages
+    let ws = null;
+    
+    function connectWebSocket() {
+        ws = new WebSocket(`ws://${window.location.host}/ws`);
+        
+        ws.onopen = () => {
+            console.log('WebSocket connected for sending messages');
+            document.getElementById('sendBtn').disabled = false;
+        };
+        
+        ws.onclose = () => {
+            console.log('WebSocket connection closed');
+            document.getElementById('sendBtn').disabled = true;
+            // Reconnect after delay
+            setTimeout(connectWebSocket, 3000);
+        };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+    }
+    
+    // Connect WebSocket for sending messages
+    connectWebSocket();
+    
+    // Helper to append messages to the chat
+    function appendMessage(data) {
+        const messagesDiv = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = data.type === 'system' ? 'text-muted small' : 'mb-2';
+        
+        const time = new Date(data.timestamp).toLocaleTimeString();
+        messageDiv.innerHTML = `<strong>[${time}]</strong> ${data.content}`;
+        
+        messagesDiv.appendChild(messageDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    // Send message via WebSocket
+    document.getElementById('sendBtn').addEventListener('click', () => {
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
+        
+        if (message && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'chat',
+                content: message
+            }));
+            input.value = '';
+        }
+    });
+    
+    // Allow Enter key to send message
+    document.getElementById('messageInput').addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            document.getElementById('sendBtn').click();
+        }
+    });
+</script>
+
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        max-width: 600px;
+        margin: 0 auto;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .message-container {
+        height: 300px;
+        overflow-y: auto;
+        padding: 10px;
+        background-color: #f9f9f9;
+    }
+    
+    .input-area {
+        display: flex;
+        padding: 10px;
+        border-top: 1px solid #ccc;
+    }
+    
+    .input-area input {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-right: 8px;
+    }
+    
+    .input-area button {
+        padding: 8px 16px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .input-area button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+    }
+    
+    .connection-status {
+        padding: 10px;
+        background-color: #eee;
+        display: flex;
+        align-items: center;
+    }
+    
+    .connection-status span {
+        margin-right: 10px;
+    }
+    
+    .connection-status button {
+        padding: 4px 8px;
+        margin-right: 5px;
+        cursor: pointer;
+    }
+    
+    .system-message {
+        color: #777;
+        font-style: italic;
+        margin: 5px 0;
+    }
+    
+    .error-message {
+        color: #d32f2f;
+        font-style: italic;
+        margin: 5px 0;
+    }
+    
+    .user-message {
+        margin: 5px 0;
+        padding: 5px;
+        background-color: #e8f5e9;
+        border-radius: 4px;
+    }
+    
+    #debug-info {
+        max-height: 150px;
+        overflow-y: auto;
+        background-color: #f5f5f5;
+        padding: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
