@@ -7,3 +7,5 @@ httpx
 nats-py
 sqlalchemy
 psycopg2-binary
+nkeys
+jwt
