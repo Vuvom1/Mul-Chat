@@ -1,3 +1,5 @@
+import asyncio
+import threading
 from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -10,6 +12,8 @@ from dotenv import load_dotenv
 from app.database.db import engine, get_db
 from app.database import models
 from sqlalchemy.orm import Session
+
+from app.services.auth_service import start_auth_service
 
 # Load environment variables from .env file
 load_dotenv()
@@ -53,3 +57,67 @@ def test_db(db: Session = Depends(get_db)):
         return {"message": "Database connection failed."}
     except Exception as e:
         return {"message": f"Database connection error: {str(e)}"}
+    
+@app.get("/test-nats")
+async def test_nats():
+    from app.services.auth_service import get_test_connection
+    try:
+        nc = await get_test_connection()
+        return {"message": "NATS connection successful!"}
+    except Exception as e:
+        return {"message": f"NATS connection error: {str(e)}"}
+    
+
+# auth_service_thread = None
+
+# # Define a function to run the auth service in a separate thread
+# def run_auth_service_in_thread():
+#     """Run the auth service in a separate thread"""
+#     from app.services.auth_service import run_auth_service
+    
+#     # Create a new event loop for this thread
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+    
+#     try:
+#         # Run the auth service async function
+#         # Make sure run_auth_service is an async function in your auth_service.py
+#         loop.run_until_complete(run_auth_service())
+#     except Exception as e:
+#         logger.error(f"Error starting auth service: {str(e)}")
+#     finally:
+#         loop.close()
+
+# @app.on_event("startup")
+# async def startup_event():
+#     """Start the application and the auth service in a background thread"""
+#     global auth_service_thread
+    
+#     logger.info("Starting up the application...")
+    
+#     # Start auth service in a separate thread
+#     auth_service_thread = threading.Thread(target=run_auth_service_in_thread, daemon=True)
+#     auth_service_thread.start()
+    
+#     logger.info("Auth service started in background thread")
+
+# @app.on_event("shutdown")
+# async def shutdown_event():
+#     """Clean up resources when the application shuts down"""
+#     logger.info("Shutting down the application...")
+    
+#     # If you need to gracefully stop the auth service, add code here
+#     # For example, you might want to implement a stop_auth_service() function
+    
+#     logger.info("Application shutdown complete.")
+
+# Add an endpoint to check auth service status
+# @app.get("/auth-service-status")
+# async def auth_service_status():
+#     """Check if the auth service is running"""
+#     global auth_service_thread
+    
+#     if auth_service_thread and auth_service_thread.is_alive():
+#         return {"status": "running"}
+#     else:
+#         return {"status": "not running"}

@@ -30,8 +30,8 @@ clients = set()
 router = APIRouter()
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, user_id: int, group_id: str):
-    await group_websocket(websocket, user_id, group_id)
+async def websocket_endpoint(websocket: WebSocket, room: str):
+    await group_websocket(websocket, room)
 
 @router.post("/send-group-message")
 async def send_group_message(message: SendMessageRequest):
