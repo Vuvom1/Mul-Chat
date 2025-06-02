@@ -11,6 +11,7 @@ import nkeys
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
+from fastapi import HTTPException
 
 from app.shared.auth_token import AuthToken
 from app.database.db import get_db
@@ -138,8 +139,21 @@ async def encode_user_jwt(username: str, user_nkey: str, issuer_keypair,
 async def verify_user_credentials(username: str, password: str) -> bool:
     # First check the database
     user = user_queries.get_user_by_username(username)
-    if user and user.hashed_password == password:  # In a real app, verify the hashed password
-        return True
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail=f"User {username} not found"
+        )
+
+    if not user.hashed_password == password:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect password"
+        )
+
+    # In a real app, verify the hashed password
+    return True
 
 async def get_user_permissions(username: str) -> Dict[str, List[str]]:
     """

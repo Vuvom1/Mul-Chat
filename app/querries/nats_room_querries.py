@@ -80,6 +80,14 @@ class NatsRoomQueries:
             NatsUserRoom, NatsRoom.id == NatsUserRoom.room_id
         ).filter(NatsUserRoom.user_id == user_id).all()
     
+    def get_room_for_user_by_username(self, username: str):
+        user = self.db.query(User).filter(User.username == username).first()
+        if not user:
+            return None
+        return self.db.query(NatsRoom).join(
+            NatsUserRoom, NatsRoom.id == NatsUserRoom.room_id
+        ).filter(NatsUserRoom.user_id == user.id).all()
+    
     # Update room
     def update_room(self, room_id: int, **kwargs):
         self.db.query(NatsRoom).filter(NatsRoom.id == room_id).update(kwargs)
