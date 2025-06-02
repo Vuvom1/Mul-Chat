@@ -24,6 +24,11 @@ class CreateGroupRequest(BaseModel):
     group_name: str
     description: str = None
 
+class CreateRoomRequest(BaseModel):
+    name: str
+    is_public: bool = False
+    description: str = None
+
 class ClientInfo(BaseModel):
     client_id: str
     username: str

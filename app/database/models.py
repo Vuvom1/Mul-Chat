@@ -101,7 +101,7 @@ class NatsRoom(Base):
     __tablename__ = "nats_rooms"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
+    name = Column(String(100), nullable=False, unique=True)
     subject_prefix = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     account_id = Column(Integer, ForeignKey("nats_accounts.id"), nullable=False)

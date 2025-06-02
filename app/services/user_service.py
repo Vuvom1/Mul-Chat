@@ -108,26 +108,26 @@ async def create_user(username: str, password: str, email: str = None):
 async def login_user(username: str, password: str, client_id: str = None, ip_address: str = None, user_agent: str = None):
     from app.nats.ncs import get_creds_path    
     # Verify credentials (this would check the hashed password in a real app)
-    user = verify_user_credentials(username, password)
-    if not user:
-        return None
+    isVerified = await verify_user_credentials(username, password)
+    if not isVerified:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Get the user from database
     db_user = user_queries.get_user_by_username(username)
     if not db_user:
-        return None
+        raise HTTPException(status_code=404, detail="User not found")
     
     # Get jwt from credentials file
     creds_file = get_creds_path(username)
     if not creds_file:
         logger.error(f"Credentials file for user {username} not found")
-        return None
+        raise HTTPException(status_code=404, detail="Credentials file not found")
     jwt, seed, public_key, account_public_key = extract_jwt_and_nkeys_seed_from_file(creds_file)
 
     if not jwt or not seed or not public_key or not account_public_key:
         logger.error(f"Failed to extract JWT or seed from credentials file for user {username}")
-        return None
-    
+        raise HTTPException(status_code=404, detail="Failed to extract JWT or seed")
+
     return {
         "jwt": jwt,
     }

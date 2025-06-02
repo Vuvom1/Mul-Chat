@@ -4,7 +4,7 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import pages
+from app.routers import pages, room_router
 from app.routers import chat_router
 from app.routers import user_router
 import logging
@@ -43,6 +43,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(chat_router.router, tags=["chat"])
 app.include_router(pages.router)
 app.include_router(user_router.router, tags=["user"])
+app.include_router(room_router.router, tags=["room"])
 
 
 # Add a simple DB test endpoint
