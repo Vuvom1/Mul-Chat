@@ -127,9 +127,12 @@ async def login_user(username: str, password: str, client_id: str = None, ip_add
     if not jwt or not seed or not public_key or not account_public_key:
         logger.error(f"Failed to extract JWT or seed from credentials file for user {username}")
         raise HTTPException(status_code=404, detail="Failed to extract JWT or seed")
+    
+    chat_rooms = nats_room_queries.get_rooms_for_user(db_user.id)
 
     return {
         "jwt": jwt,
+        "chat_rooms": [room.name for room in chat_rooms],
     }
 
 # Remaining functions

@@ -1,6 +1,7 @@
 import base64
 import datetime
 import json
+import uuid
 from fastapi import FastAPI, WebSocket, HTTPException
 from nats.aio.client import Client as NATS
 import os
@@ -88,6 +89,8 @@ async def user_rooms_websocket(websocket: WebSocket, current_user: str):
 
         try:
             nc = await get_nats_client()
+
+            js = nc.jetstream()
         except Exception as e:
             logger.error(f"NATS connection error: {str(e)}")
             # Don't raise HTTPException here, use WebSocket close instead
@@ -139,8 +142,14 @@ async def user_rooms_websocket(websocket: WebSocket, current_user: str):
                     await websocket.close(code=1008, reason="Not subscribed to room")
                     return
 
+                message['type'] = "chat"
+                message['user'] = current_user
+                message["timestamp"] = datetime.datetime.now().isoformat()
+
                 message_json = json.dumps(message)
-                await nc.publish(f"room.{room}", message_json.encode())
+
+                # Publish the message to the JetStream and NATS subject
+                await js.publish(f"room.{room}", message_json.encode())
                 logger.debug(f"Published message to room.{room}")
 
         except Exception as e:
@@ -155,3 +164,59 @@ async def user_rooms_websocket(websocket: WebSocket, current_user: str):
                 await nc.drain()
             except:
                 pass
+
+async def get_room_message_history(room_name: str, limit: int = 50):
+    try:
+        nc = await get_nats_client()
+        js = nc.jetstream()
+        
+        stream_name = f"CHAT_ROOMS"
+        subject = f"room.{room_name}"
+        
+        try:
+            # Check if stream exists
+            await js.stream_info(stream_name)
+        except Exception as e:
+            logger.warning(f"Stream {stream_name} not found: {str(e)}")
+            return []        
+        
+        # Create ephemeral consumer (non-durable)
+        consumer = await js.pull_subscribe(subject, "")
+        
+        # Fetch messages
+        messages = []
+        batch_size = min(limit, 100)  # Process in batches of 100 or less
+        
+        try:
+            # Fetch messages in batches
+            for _ in range((limit + batch_size - 1) // batch_size):  # Ceiling division
+                fetch_limit = min(batch_size, limit - len(messages))
+                if fetch_limit <= 0:
+                    break
+                    
+                batch = await consumer.fetch(batch=fetch_limit, timeout=1)
+                
+                for msg in batch:
+                    try:
+                        data = json.loads(msg.data.decode())
+                        messages.append(data)
+                        await msg.ack()
+                    except json.JSONDecodeError:
+                        logger.warning(f"Invalid JSON in message: {msg.data.decode()}")
+                    except Exception as msg_err:
+                        logger.error(f"Error processing message: {str(msg_err)}")
+        finally:
+            # Clean up the consumer
+            try:
+                await consumer.unsubscribe()
+            except:
+                pass
+        
+        # Sort messages by timestamp
+        messages.sort(key=lambda m: m.get("timestamp", ""))
+        
+        return messages
+        
+    except Exception as e:
+        logger.error(f"Error retrieving message history: {str(e)}")
+        return []

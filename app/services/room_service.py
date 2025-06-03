@@ -1,3 +1,4 @@
+import json
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import uuid
@@ -7,6 +8,7 @@ from fastapi import HTTPException
 from app.database.db import get_db
 from app.querries.nats_room_querries import NatsRoomQueries
 from app.querries.user_querries import UserQueries
+from app.services.chat_service import get_nats_client, get_room_message_history
 
 db = next(get_db())
 nats_room_queries = NatsRoomQueries(db)
@@ -62,6 +64,22 @@ async def join_room(
 
     nats_room_queries.add_user_to_room(user_id=user.id, room_id=room.id)
 
+    system_message = {
+        "type": "system",
+        "room": room.name,
+        "user": current_user,
+        "message": f"User '{current_user}' has joined the room '{room.name}'."
+    }
+
+    # Publish a system message to the room's subject
+    nc = await get_nats_client()
+    js = nc.jetstream()
+    subject = f"{room.subject_prefix}.{room.name}"
+
+    await js.publish(subject, json.dumps(system_message).encode())
+
+    chat_history = await get_room_message_history(room.name)
+
     return {
         "id": room.id,
         "name": room.name,
@@ -69,6 +87,7 @@ async def join_room(
         "account_id": room.account_id,
         "description": room.description,
         "is_public": room.is_public,
+        "history": chat_history,
         "created_at": room.created_at.isoformat() if hasattr(room, 'created_at') and room.created_at else None
     }
 
@@ -92,7 +111,43 @@ async def leave_room(
 
     nats_room_queries.remove_user_from_room(user_id=user.id, room_id=room.id)
 
+    system_message = {
+        "type": "system",
+        "room": room.name,
+        "user": current_user,
+        "message": f"User '{current_user}' has left the room '{room.name}'."
+    }
+
+    # Publish a system message to the room's subject
+    nc = await get_nats_client()
+    js = nc.jetstream()
+    subject = f"{room.subject_prefix}.{room.name}"
+    await js.publish(subject, json.dumps(system_message).encode())
+
     return {
         "message": f"User '{current_user}' left room '{room.name}' successfully."
     }
 
+async def setup_stream_for_rooms(
+) -> dict[str, Any]:
+    try:
+        nc = await get_nats_client()
+        stream_name = f"CHAT_ROOMS"
+
+        js = nc.jetstream()
+
+        await js.add_stream(
+            name=stream_name,
+            subjects=[f"room.*"],
+            retention="limits",  # Retain messages based on limits
+            max_age=60 * 60 * 24 * 30,  # 30 days
+            max_bytes=1024 * 1024 * 100,  # 100 MB
+            storage="file",  # Use file storage
+            )
+                
+        return {
+            "message": f"Stream '{stream_name}' created successfully."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create stream: {str(e)}")
+    
